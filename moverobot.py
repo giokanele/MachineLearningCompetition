@@ -7,9 +7,14 @@ from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from geometry_msgs.msg import Twist
-
+import random
+import threading
 holder = -2
 index = 0
+user_input = ""
+capture = threading.Event()
+capture.clear()
+
 class image_converter:
 
   def __init__(self):
@@ -23,6 +28,10 @@ class image_converter:
     self.image_sub = rospy.Subscriber("/R1/pi_camera/image_raw",Image,self.callback)
 
   def callback(self,data):
+    
+    global capture
+    global user_input
+    
     try:
       frame = self.bridge.imgmsg_to_cv2(data, "bgr8")
     except CvBridgeError as e:
@@ -77,6 +86,8 @@ class image_converter:
       approx = cv2.approxPolyDP(contour, 0.13 * cv2.arcLength(contour, True), True)
       if len(approx) > 6:
         continue
+      if getInfo(contour, "maxy") >= 715: #remove contours touching the bottom of page
+        continue
       square_contours.append(contour)
       cv2.drawContours(frame, [contour], 0, (0, 255, 0), 3)
     
@@ -121,6 +132,7 @@ class image_converter:
       #get license plate coordinates
       elif np.linalg.norm( colour - np.array((200, 200, 200)) ) < 10 or np.linalg.norm( colour - np.array((122, 122, 122)) ) < 10:
         # cv2.drawContours(frame, [topBox], 0, (0, 0, 255), 3)
+        found = False
         blank = np.zeros_like(frame)
         zone = cv2.drawContours(blank, [topBox], -1, (255, 255, 255), -1)
         newImage = cv2.bitwise_and(blur, zone)
@@ -172,6 +184,14 @@ class image_converter:
 
         cv2.imshow("plate", licensePlate)
 
+        # Save image if instructed
+        if capture.is_set():
+          number = random.randint(1000,9999) # prevent duplicate names
+          filename = "plate" + "_" + user_input + "_" + str(number) + ".png" 
+          cv2.imwrite("plateData/" + filename, licensePlate)
+          print("Image Saved:", filename)
+          
+
       # print( square_contours[0].shape)
     # M = cv2.moments(contour)
     # if M["m00"] != 0:
@@ -180,22 +200,24 @@ class image_converter:
         # cY = int(M["m01"] / M["m00"])
     
     
-
+    
     cv2.imshow("Image window", frame)
     # cv2.imshow("Blue", blue)
-    try:
-      cv2.imshow("Grey", grey)
-    except:
-      blank = np.zeros_like(frame)
-      cv2.imshow("Grey", blank)
+    #try:
+    #  cv2.imshow("Grey", grey)
+    #except:
+    #  blank = np.zeros_like(frame)
+    #  cv2.imshow("Grey", blank)
 
-    try:
-      cv2.imshow("Zone", newImage)
-    except:
-      blank = np.zeros_like(frame)
-      cv2.imshow("Zone", blank)
+    #try:
+    #  cv2.imshow("Zone", newImage)
+    #except:
+    #  blank = np.zeros_like(frame)
+    #  cv2.imshow("Zone", blank)
       
     # cv2.imshow("Bitwise", res)
+
+    capture.clear()
     cv2.waitKey(2)
 
     # try:
@@ -256,5 +278,21 @@ def main():
     print("Shutting down")
   cv2.destroyAllWindows()
 
+def collect_plates():
+  global user_input
+  
+  while True:
+    value = input("Enter something: ")
+    if(value == "q"):
+      capture.set()
+      print("Message sent")
+    else: 
+      user_input = value
+      # Do something with the user input
+
 if __name__ == '__main__':
-    main() 
+    if False: # for data collection
+      background_thread = threading.Thread(target=collect_plates)
+      background_thread.daemon = True
+      background_thread.start()
+    main()
