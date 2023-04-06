@@ -10,6 +10,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from geometry_msgs.msg import Twist
 
 
+
  # Initialize to check if HSV min/max value changes
 hMin = sMin = vMin = hMax = sMax = vMax = 0
 phMin = psMin = pvMin = phMax = psMax = pvMax = 0
@@ -37,32 +38,8 @@ class image_converter:
       print(e)
     
 
-    frame = cv2.resize(frame, (300,300)) 
-
-    # hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    # gaussian = cv2.GaussianBlur(hsv,(5,5),0)
-    # median3 = cv2.medianBlur(hsv,3)
-    # median5 = cv2.medianBlur(hsv,5)
-
-
-    # lower1 = np.array([0, 0, 200])
-    # upper1 = np.array([255, 255, 255])
-    # # Threshold the HSV image to get only blue colors
-    # mask = cv2.inRange(hsv, lower1, upper1)
-    # mask2 = cv2.inRange(median5, lower1, upper1)
-    # mask3 = cv2.inRange(median3, lower1, upper1)
-    # mask4 = cv2.inRange(gaussian, lower1, upper1)
-    # # Bitwise-AND mask and original image
-    # res1 = cv2.bitwise_and(frame,frame, mask= mask)
-    # res2 = cv2.bitwise_and(frame,frame, mask= mask2)
-    # res3 = cv2.bitwise_and(frame,frame, mask= mask3)
-    # res4 = cv2.bitwise_and(frame,frame, mask= mask4)
-
-
-    # cv2.imshow("Original", res1)
-    # cv2.imshow("Blurred 50", res2)
-    # cv2.imshow("Blurred 30", res3)
-    # cv2.imshow("Gaussian", res4)
+    frame = cv2.resize(frame, (300,300))
+    
     cv2.waitKey(2)
 
     global holder
@@ -127,16 +104,7 @@ class image_converter:
       # Display output image
       cv2.imshow('image',output)
 
-    # try:
-    #   rospy.Rate(15).sleep() 
-    #   self.image_pub.publish(vel_msg)
-    # except CvBridgeError as e:
-    #   print(e)
  
-    # try:
-    #   self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "bgr8"))
-    # except CvBridgeError as e:
-    #   print(e)
     holder +=1
  
 def main():
