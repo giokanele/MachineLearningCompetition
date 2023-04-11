@@ -3,6 +3,7 @@
 import rospy
 import cv2
 import sys
+import os
 import numpy as np
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
@@ -11,6 +12,7 @@ from geometry_msgs.msg import Twist
 import threading
 import time 
 from pynput import keyboard
+from datetime import datetime
 
  
 # boolean to send message between threads
@@ -19,7 +21,7 @@ init = True
 myData = []
 
 state =5 # 0=left, 1=forward, 2=right, 5 = no initialized
-
+count = 0
 class image_converter:
 
   def __init__(self):
@@ -35,14 +37,18 @@ class image_converter:
 
   def speed_callback(self, data):
     self.twist = data
-    global state
-    if self.twist.linear.x == 0:
-      if self.twist.angular.z > 0:
-        state  = 0
+    global state, capture
+    if capture.is_set():
+      if self.twist.linear.x == 0:
+        if self.twist.angular.z > 0:
+          state  = 0
+        elif self.twist.angular.z < 0:
+          state = 2
+        else:
+           state = 5
       else:
-        state = 2
-    else:
         state = 1
+
         
     
         
@@ -55,7 +61,7 @@ class image_converter:
       print(e)
     
     
-    frame = cv2.resize(frame[400:], (300,300)) 
+    frame = cv2.resize(frame[400:], (200,200)) 
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
@@ -66,10 +72,20 @@ class image_converter:
    
     # Bitwise-AND mask and original image
     res = cv2.bitwise_and(frame,frame, mask= mask)
-    cv2.imshow("Original", res)
+    bgr = cv2.cvtColor(res, cv2.COLOR_HSV2BGR)
+    grayscale = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+
+
+    cv2.imshow("Original", grayscale)
     cv2.waitKey(2)
 
-    global myData, init, capture, state
+    global myData, init, capture, state,count
+
+    if state == 1:
+      count +=1
+    else:
+      count = 0
+    
     
     # Do something continuously
     if capture.is_set():
@@ -77,16 +93,29 @@ class image_converter:
             myData = []
         
             init = False
-        if init == False:
-            myData.append(np.array([res,state]))  #append data every frame 
+        if init == False and state != 5 and count < 2:
+            myData.append(np.array([grayscale,state]))  #append data every frame 
 
     else:
         if init == False:   #if init just turned off, 
             array = np.array(myData)
             print(array.shape)
+           
+
             
-            # save numpy array instead
+            cv2.imshow("first", array[0][0])
+
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            home_dir = os.path.expanduser('~')
+
+            # Construct the file path
+            file_path = os.path.join(home_dir, 'ros_ws', 'src', 'my_controller', 'road_data', now + '.npy')
+         
+            # save numpy array
+            np.save(file_path, array)
+
             init = True
+            state = 5
    
 
 
