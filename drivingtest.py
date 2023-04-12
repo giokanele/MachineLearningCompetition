@@ -45,10 +45,12 @@ class image_converter:
       frame = self.bridge.imgmsg_to_cv2(data, "bgr8")
     except CvBridgeError as e:
       print(e)
-    
+    cv2.imshow("Original", frame)
     
     frame = cv2.resize(frame[400:], (200,200)) 
 
+
+    #*** ROAD IMAGE PROCESSING ***
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
     lower1 = np.array([0, 0, 157])
@@ -60,26 +62,35 @@ class image_converter:
     res = cv2.bitwise_and(frame,frame, mask= mask)
     bgr = cv2.cvtColor(res, cv2.COLOR_HSV2BGR)
     grayscale = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    print(grayscale.shape)
 
+    #*** END ROAD IMAGE PROCESSING ***
+
+    #*** ROAD STATE PREDICTION ***
     goto_state = self.road_model.predict(np.expand_dims(np.array([grayscale]), axis = -1))
+
+
+    
 
     softmax_output = np.exp(goto_state[0]) / np.sum(np.exp(goto_state[0]))
 
 
     print(goto_state)
 
-    x = (goto_state[0][1]-goto_state[0][0]-goto_state[0][2])/3
+    x = goto_state[0][1]-0.5*goto_state[0][0]-0.5*goto_state[0][2]
     
-    z = (goto_state[0][0]-goto_state[0][2])/softmax_output[0]
+    z = 3*(goto_state[0][0]-goto_state[0][2])/softmax_output[0]
 
-    if x<0:
-        x = 0
-    elif x>0.2:
-        x = 0.2
-    if  z<-0.2:
-        z = -0.2  
-    elif z>0.2:
-        z = 0.2
+    if x<0.05:
+        x = 0.05
+    elif x>0.3:
+        x = 0.3
+    else:
+        x = np.log(x+1)/3
+    if  z<-0.5:
+        z = -0.5  
+    elif z>0.5:
+        z = 0.5
     
     self.twist.linear.x = x
     self.twist.angular.z = z   
@@ -97,7 +108,7 @@ class image_converter:
 
     self.cmd_vel_pub.publish(self.twist)
 
-    cv2.imshow("Original", grayscale)
+    cv2.imshow("img being processed", grayscale)
     cv2.waitKey(2)
 
     

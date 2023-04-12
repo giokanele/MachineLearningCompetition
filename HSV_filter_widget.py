@@ -87,9 +87,39 @@ class image_converter:
       upper = np.array([hMax, sMax, vMax])
 
       # Create HSV Image and threshold into a range.
+      img = cv2.GaussianBlur(img, (7, 7), 0)
       hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
       mask = cv2.inRange(hsv, lower, upper)
       output = cv2.bitwise_and(img,img, mask= mask)
+
+      darklower = np.array([16, 39, 89])
+      darkupper = np.array([35, 71, 151])
+
+      darkmask = cv2.inRange(hsv, darklower, darkupper)
+
+      lightlower = np.array([12, 32, 153])
+      lightupper = np.array([49, 64, 255])
+
+      lightmask = cv2.inRange(hsv, lightlower, lightupper)
+
+      
+
+      outputtest = cv2.bitwise_or(lightmask,darkmask)
+      #print("outputtest shape: " + str(outputtest.shape))
+      blurred_output = cv2.GaussianBlur(outputtest, (7, 7), 0)
+      cv2.imshow('blurred_output',blurred_output)
+      vertical_blur = cv2.blur(outputtest, (2, 20))
+
+      cv2.imshow('vertical_blur',vertical_blur)
+
+      cv2.imshow('outputtest',outputtest)
+
+      # bgr = cv2.cvtColor(outputtest, cv2.COLOR_HSV2BGR)
+      # grayscale = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+
+      # cv2.imshow('grayscale',grayscale)
+
+
 
       # Print if there is a change in HSV value
       if( (phMin != hMin) | (psMin != sMin) | (pvMin != vMin) | (phMax != hMax) | (psMax != sMax) | (pvMax != vMax) ):
@@ -101,7 +131,27 @@ class image_converter:
           psMax = sMax
           pvMax = vMax
 
+
+      #mask dark part
+      #Hmin = 16
+      #Smin = 39
+      #Vmin = 89
+
+      #Hmax = 35
+      #Smax = 71
+      #vMax = 151
+
+      #mask light part
+      #Hmin = 12
+      #Smin = 32
+      #Vmin = 153
+
+      #Hmax = 49
+      #Smax = 64
+      #vMax = 255
+
       # Display output image
+      
       cv2.imshow('image',output)
 
  

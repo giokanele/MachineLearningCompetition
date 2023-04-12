@@ -41,13 +41,13 @@ class image_converter:
     if capture.is_set():
       if self.twist.linear.x == 0:
         if self.twist.angular.z > 0:
-          state  = 0
+          state  = 0 #left
         elif self.twist.angular.z < 0:
-          state = 2
+          state = 2 #right
         else:
            state = 5
       else:
-        state = 1
+        state = 1 #straight
 
         
     
@@ -60,28 +60,37 @@ class image_converter:
     except CvBridgeError as e:
       print(e)
     
-    
+    cv2.imshow("Original", frame)
     frame = cv2.resize(frame[400:], (200,200)) 
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-    lower1 = np.array([0, 0, 157])
-    upper1 = np.array([0, 0, 255])
-    # Threshold the HSV image to get only blue colors
-    mask = cv2.inRange(hsv, lower1, upper1)
-   
-    # Bitwise-AND mask and original image
-    res = cv2.bitwise_and(frame,frame, mask= mask)
-    bgr = cv2.cvtColor(res, cv2.COLOR_HSV2BGR)
-    grayscale = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    darklower = np.array([16, 39, 89])
+    darkupper = np.array([35, 71, 151])
+
+    darkmask = cv2.inRange(hsv, darklower, darkupper)
+
+    lightlower = np.array([12, 32, 153])
+    lightupper = np.array([49, 64, 255])
+
+    lightmask = cv2.inRange(hsv, lightlower, lightupper)
+
+    outputtest = cv2.bitwise_or(lightmask,darkmask)
+
+    vertical_blur = cv2.blur(outputtest, (2, 20)) #already in gray scale
+    
 
 
-    cv2.imshow("Original", grayscale)
+
+    
+
+
+    cv2.imshow("blurred", vertical_blur)
     cv2.waitKey(2)
 
     global myData, init, capture, state,count
 
-    if state == 1:
+    if state < 2:
       count +=1
     else:
       count = 0
@@ -93,8 +102,8 @@ class image_converter:
             myData = []
         
             init = False
-        if init == False and state != 5 and count < 2:
-            myData.append(np.array([grayscale,state]))  #append data every frame 
+        if init == False and state != 5 and count < 10:
+            myData.append(np.array([vertical_blur,state]))  #append data every frame 
 
     else:
         if init == False:   #if init just turned off, 
@@ -109,7 +118,7 @@ class image_converter:
             home_dir = os.path.expanduser('~')
 
             # Construct the file path
-            file_path = os.path.join(home_dir, 'ros_ws', 'src', 'my_controller', 'road_data', now + '.npy')
+            file_path = os.path.join(home_dir, 'ros_ws', 'src', 'my_controller', 'sfu_data', now + '.npy')
          
             # save numpy array
             np.save(file_path, array)
