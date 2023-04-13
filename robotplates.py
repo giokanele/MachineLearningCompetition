@@ -43,7 +43,7 @@ class history:
     if found == 1:
       self.plates.append(plate)
 
-    if(self.state =< 9):
+    if(self.state <= 9):
       sample, waittime = self.timings[self.state + 1]
     else:
       sample, waittime = (20, 30)
