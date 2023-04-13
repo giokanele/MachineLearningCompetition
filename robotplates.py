@@ -30,15 +30,25 @@ class history:
     self.green = False
     self.passed = False
     self.results = []
-    timings = {1:(10, 25), 2:(),3:(), 4:(),5:(), 6:(),7:(), 8:()}
-    
+    self.sleep = 0
+    self.timings = {1:(15, 30), 2:(15, 30),3:(15, 30), 4:(15, 30),5:(15, 30), 6:(15, 30),7:(15, 30), 8:(15, 30)}
+    self.license_pub = rospy.Publisher("/license_plate",String, queue_size=1)
+
   def input(self, found, plate = "YOLO"):
     self.hist.append(found)
     send = False
+    if(self.sleep > 0):
+      self.sleep -= 1
+      return
     if found == 1:
       self.plates.append(plate)
 
-    if(np.average(self.hist[-20:]) > 0.7):
+    if(self.state =< 9):
+      sample, waittime = self.timings[self.state + 1]
+    else:
+      sample, waittime = (20, 30)
+
+    if(np.average(self.hist[-sample:]) > 0.7):
       self.green = True
     else:
       if self.green == True:
@@ -49,7 +59,8 @@ class history:
     
     if(send == True):
       self.sendmessage()
-      print("Sending!")
+      # print("Sending!")
+      self.sleep = waittime
       send = False
 
     # print("found:", found, "State is:", self.state, "Green:", self.green, "hist_avg:", np.average(self.hist[-20:]), "Results", self.results)
@@ -62,6 +73,7 @@ class history:
     #reset variables
     self.plates.clear()
     self.hist = list(np.zeros(50))
+    self.license_pub.publish("Gio's team,password,{},".format(self.state) + plate)
     return
 
 class image_converter:
@@ -74,7 +86,10 @@ class image_converter:
     self.bridge = CvBridge()
     self.image_sub = rospy.Subscriber("/R1/pi_camera/image_raw",Image,self.callback)
     self.history = history()
-    # Load character recognition model
+
+    time.sleep(1)
+    print("Message sent!")
+    self.license_pub.publish("Gio's team,password,0,AA00")
     
 
   def callback(self,data):
