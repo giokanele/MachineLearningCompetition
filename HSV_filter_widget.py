@@ -16,6 +16,9 @@ hMin = sMin = vMin = hMax = sMax = vMax = 0
 phMin = psMin = pvMin = phMax = psMax = pvMax = 0
 holder =0
 
+contours_seen=0
+
+
 
 
 
@@ -38,7 +41,7 @@ class image_converter:
       print(e)
     
 
-    frame = cv2.resize(frame, (300,300))
+    frame
     
     cv2.waitKey(2)
 
@@ -92,27 +95,67 @@ class image_converter:
       mask = cv2.inRange(hsv, lower, upper)
       output = cv2.bitwise_and(img,img, mask= mask)
 
-      darklower = np.array([16, 39, 89])
-      darkupper = np.array([35, 71, 151])
+      redlower = np.array([0, 157, 44])
+      redupper = np.array([39, 255, 255])
 
-      darkmask = cv2.inRange(hsv, darklower, darkupper)
+      redmask = cv2.inRange(hsv, redlower, redupper)
+      cv2.imshow('redmask',redmask)
 
-      lightlower = np.array([12, 32, 153])
-      lightupper = np.array([49, 64, 255])
+      test1 = cv2.cvtColor(redmask, cv2.COLOR_GRAY2BGR)
 
-      lightmask = cv2.inRange(hsv, lightlower, lightupper)
+      
+    
+     
+      contours, _ = cv2.findContours(redmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+      cont_len = contours.__len__()
+      
 
       
 
-      outputtest = cv2.bitwise_or(lightmask,darkmask)
-      #print("outputtest shape: " + str(outputtest.shape))
-      blurred_output = cv2.GaussianBlur(outputtest, (7, 7), 0)
-      cv2.imshow('blurred_output',blurred_output)
-      vertical_blur = cv2.blur(outputtest, (2, 20))
 
-      cv2.imshow('vertical_blur',vertical_blur)
 
-      cv2.imshow('outputtest',outputtest)
+      if contours:
+        
+
+      
+
+        contourtest, _ = cv2.findContours(redmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+
+        cv2.drawContours(test1, contourtest, -1, (255, 0, 255), 2)
+        
+
+
+        largest_contour = max(contours, key=cv2.contourArea)
+        largest_contour = max(contours, key=cv2.contourArea)
+
+        # Get bounding box coordinates of largest contour
+        x, y, w, h = cv2.boundingRect(largest_contour)
+
+        # Check if the bottom edge of the bounding box is touching the bottom of the image
+        if y + h == img.shape[0] and cv2.contourArea(largest_contour) > 50 and cont_len ==2:
+          print('The largest contour is touching the bottom of the image')
+          print("SPEED UP")
+        else:
+          print("drive normally")
+        
+
+  
+
+        cv2.drawContours(test1, [largest_contour], 0, (0, 255, 0), 6)
+
+      
+        
+      
+
+      
+      cv2.imshow('test1',test1)
+
+
+
+      
+
+      
 
       # bgr = cv2.cvtColor(outputtest, cv2.COLOR_HSV2BGR)
       # grayscale = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
