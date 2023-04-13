@@ -9,11 +9,60 @@ from cv_bridge import CvBridge, CvBridgeError
 from geometry_msgs.msg import Twist
 import random
 import threading
+
+from keras import models
+import time
+
+
 holder = -2
 index = 0
 user_input = ""
 capture = threading.Event()
 capture.clear()
+licensePlateModel = models.load_model("/home/fizzer/ros_ws/src/comp/licenseNNv2.keras")
+
+class history:
+
+  def __init__(self):
+    self.plates = []
+    self.state = 0
+    self.hist = list(np.zeros(50))
+    self.green = False
+    self.passed = False
+    self.results = []
+    timings = {1:(10, 25), 2:(),3:(), 4:(),5:(), 6:(),7:(), 8:()}
+    
+  def input(self, found, plate = "YOLO"):
+    self.hist.append(found)
+    send = False
+    if found == 1:
+      self.plates.append(plate)
+
+    if(np.average(self.hist[-20:]) > 0.7):
+      self.green = True
+    else:
+      if self.green == True:
+        send = True
+        self.state += 1
+      self.green = False
+      
+    
+    if(send == True):
+      self.sendmessage()
+      print("Sending!")
+      send = False
+
+    # print("found:", found, "State is:", self.state, "Green:", self.green, "hist_avg:", np.average(self.hist[-20:]), "Results", self.results)
+    return
+
+  def sendmessage(self):
+    List = self.plates[max(0, len(self.plates) - 10):]
+    plate = max(set(List), key = List.count)
+    self.results.append(plate)
+    #reset variables
+    self.plates.clear()
+    self.hist = list(np.zeros(50))
+    return
 
 class image_converter:
 
@@ -22,16 +71,19 @@ class image_converter:
     self.license_pub = rospy.Publisher("/license_plate",String, queue_size=1)
 
     self.twist = Twist()
-
-
     self.bridge = CvBridge()
     self.image_sub = rospy.Subscriber("/R1/pi_camera/image_raw",Image,self.callback)
+    self.history = history()
+    # Load character recognition model
+    
 
   def callback(self,data):
-    
     global capture
     global user_input
+
     
+    timer = time.time()
+
     try:
       frame = self.bridge.imgmsg_to_cv2(data, "bgr8")
     except CvBridgeError as e:
@@ -182,41 +234,44 @@ class image_converter:
         matrix = cv2.getPerspectiveTransform(pts1,pts2)
         licensePlate = cv2.warpPerspective(frame2,matrix,(cols, rows))
 
+        slice = {0:27, 1:103, 2:255, 3:332}
+        ymin = 30
+        width = 85
+        height = 60
+        for i in range(4):
+          cv2.rectangle(licensePlate, (slice[i], ymin), (slice[i] + width, ymin + height), (0,255,0), 2)
         cv2.imshow("plate", licensePlate)
+        
 
-        # Save image if instructed
+        pic = licensePlate*(100/np.average(licensePlate[:, :, 2])) #normalize
+        ans = ""
+        global licensePlateModel
+        for i in range(4):
+          character = pic[ymin:ymin + height, slice[i]:slice[i] + width, 2]
+          y_predict = licensePlateModel(np.expand_dims(character, axis = 0))[0]
+          if i == 0 or i == 1:
+            ans += "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[np.argmax(y_predict[0:26])]
+          else:
+            ans += "0123456789"[np.argmax(y_predict[26:])]
+
+        cv2.putText(frame,ans, (50,50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255))
+
+        # Save image if instructed - for data collection
         if capture.is_set():
           number = random.randint(1000,9999) # prevent duplicate names
           filename = "plate" + "_" + user_input + "_" + str(number) + ".png" 
-          cv2.imwrite("plateData/" + filename, licensePlate)
+          cv2.imwrite("plateData2/" + filename, licensePlate)
           print("Image Saved:", filename)
-          
-
-      # print( square_contours[0].shape)
-    # M = cv2.moments(contour)
-    # if M["m00"] != 0:
-        # Calculate centroid
-        # cX = int(M["m10"] / M["m00"])
-        # cY = int(M["m01"] / M["m00"])
+        
+        self.history.input(1, plate = ans)
     
+    if(found == False):
+      self.history.input(0)
     
+    change = time.time() - timer
+    # print(change)
     
     cv2.imshow("Image window", frame)
-    # cv2.imshow("Blue", blue)
-    #try:
-    #  cv2.imshow("Grey", grey)
-    #except:
-    #  blank = np.zeros_like(frame)
-    #  cv2.imshow("Grey", blank)
-
-    #try:
-    #  cv2.imshow("Zone", newImage)
-    #except:
-    #  blank = np.zeros_like(frame)
-    #  cv2.imshow("Zone", blank)
-      
-    # cv2.imshow("Bitwise", res)
-
     capture.clear()
     cv2.waitKey(2)
 
@@ -230,7 +285,6 @@ class image_converter:
     #   self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "bgr8"))
     # except CvBridgeError as e:
     #   print(e)
-
 
 def getInfo(contour, attr = "None"):
   if attr == "com": 
