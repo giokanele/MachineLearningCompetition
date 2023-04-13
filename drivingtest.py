@@ -11,21 +11,21 @@ from cv_bridge import CvBridge, CvBridgeError
 from geometry_msgs.msg import Twist
 import threading
 
-
+import time
 
 from tensorflow import keras
 
  
 
+reset = threading.Event()
 
 state =5 # 0=left, 1=forward, 2=right, 5 = no initialized
 prevx = 0
 prevz = 0
-competition_state = 0 # 0 = hard coded turn, 1 = driving outer ring, 2 = go through crosswalk
+competition_state = 0 # 0 = hard coded turn, 1 = driving outer ring, 2 = go through crosswalk, 3 = SFU HILL driving
 frames = 0
 oncrosswalk = False
 crosswalks_crossed = 0
-flag  = False
 sfu_model = keras.models.load_model("/home/fizzer/ros_ws/src/my_controller/secondSfuModel.h5")
 road_model = keras.models.load_model("/home/fizzer/ros_ws/src/my_controller/thirdModel.h5")
 
@@ -45,12 +45,27 @@ class image_converter:
         
 
   def callback(self,data):
-    global prevx, prevz, frames, competition_state, oncrosswalk, crosswalks_crossed, road_model, sfu_model,flag
+    global prevx, prevz, frames, competition_state, oncrosswalk, crosswalks_crossed, road_model, sfu_model
+    if reset.is_set():
+      frames = 0
+      prevx = 0
+      prevz = 0
+      competition_state = 0
+      oncrosswalk = False
+      crosswalks_crossed = 0
+      self.twist.angular.z = 0
+      self.twist.linear.x = 0
+      self.cmd_vel_pub.publish(self.twist)
+      time.sleep(5)
+
+
+      print("Reset successful!")
+      reset.clear()
     try: 
       frame = self.bridge.imgmsg_to_cv2(data, "bgr8")
     except CvBridgeError as e:
       print(e)
-    cv2.imshow("Original", frame)
+    
     
     #HARD CODE FOR FIRST TURN
     if competition_state == 0:
@@ -118,12 +133,17 @@ class image_converter:
           z = max_ang_vel
       
       
-      self.twist.linear.x = x
-      self.twist.angular.z = z
+      # self.twist.linear.x = x
+      # self.twist.angular.z = z
+      
+      self.twist.linear.x = 0.85*x + 0.15*prevx
+      self.twist.angular.z = 0.85*z + 0.15*prevz
+      prevx = self.twist.linear.x
+      prevz = self.twist.angular.z
       
       self.cmd_vel_pub.publish(self.twist)
 
-      cv2.imshow("img being processed", grayscale)
+      
 
       #full image blur, mask for red cross walk, find contours, find largest contour, check if bottom edge is touching bottom of image
       img = cv2.GaussianBlur(img, (7, 7), 0)
@@ -131,7 +151,7 @@ class image_converter:
       redlower = np.array([0, 157, 44])
       redupper = np.array([39, 255, 255])
       redmask = cv2.inRange(hsv, redlower, redupper)
-      cv2.imshow('redmask',redmask)
+      
       test1 = cv2.cvtColor(redmask, cv2.COLOR_GRAY2BGR)
       contours, _ = cv2.findContours(redmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
       cont_len = contours.__len__()
@@ -143,7 +163,7 @@ class image_converter:
         # Get bounding box coordinates of largest contour
         xcoord1, ycoord1, wcoord1, hcoord1 = cv2.boundingRect(largest_contour)
         # Check if the bottom edge of the bounding box is touching the bottom of the image
-        if ycoord1 + hcoord1 +20 >  img.shape[0] and cv2.contourArea(largest_contour) > 50 and cont_len ==2 and not oncrosswalk:
+        if ycoord1 + hcoord1 +40 >  img.shape[0] and cv2.contourArea(largest_contour) > 50 and cont_len ==2 and not oncrosswalk:
           print('The largest contour is touching the bottom of the image')
           print("SPEED UP")
           oncrosswalk = True
@@ -172,7 +192,7 @@ class image_converter:
       redlower = np.array([0, 157, 44])
       redupper = np.array([39, 255, 255])
       redmask = cv2.inRange(hsv, redlower, redupper)
-      cv2.imshow('redmask',redmask)
+      
       if frames == 0:
         self.twist.linear.x = 0.0
         self.twist.angular.z = 0.0
@@ -190,12 +210,12 @@ class image_converter:
         frames += 1  
         print(error)
       
-      if frames > 10 and frames < 20:
+      if frames > 10 and frames < 18:
         self.twist.linear.x = 1.2
         self.twist.angular.z = 0.0
         frames += 1
 
-      if frames >= 20:
+      if frames >= 18:
         self.twist.linear.x = 0
         self.twist.angular.z = 0
         frames = 0
@@ -204,30 +224,19 @@ class image_converter:
         if crosswalks_crossed ==2:
           competition_state = 3
         
-        
-
-      # if frames <20 and frames > 10:
-      #   self.twist.angular.z = 0
-        # self.twist.linear.x = 1.0
-
-          
-          
-         
-
-
+      
       self.cmd_vel_pub.publish(self.twist)
 
       
 
-      # # frames +=1
-      # # if frames >15:
-      # #     competition_state = 3
-      # #     frames = 0
+      
             
        
 
 
-
+    #SFU HILL PORTION
+    #
+    #
     if competition_state == 3:
       print("competition state 3")
       #*** SFU IMAGE PROCESSING ***
@@ -270,8 +279,13 @@ class image_converter:
           z = max_ang_vel
       
       
-      self.twist.linear.x = x
-      self.twist.angular.z = z
+      
+      self.twist.linear.x = 0.85*x + 0.15*prevx
+      self.twist.angular.z = 0.85*z + 0.15*prevz
+      prevx = self.twist.linear.x
+      prevz = self.twist.angular.z
+      # self.twist.linear.x = x
+      # self.twist.angular.z = z
       
       self.cmd_vel_pub.publish(self.twist)
 
@@ -305,12 +319,18 @@ def main():
     print("Shutting down")
   cv2.destroyAllWindows()
 
-
-
-
-
-
+def reset_button():
+  global reset
+  while True:
+    value = input()
+    if(value == "r"):
+      reset.set()
+      print("Resetting queue")
 
 if __name__ == '__main__':
-    
+    if True:
+      background_thread = threading.Thread(target=reset_button)
+      background_thread.daemon = True
+      background_thread.start()
+      reset.clear()
     main()

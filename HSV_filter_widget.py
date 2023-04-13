@@ -136,6 +136,8 @@ class image_converter:
         if y + h == img.shape[0] and cv2.contourArea(largest_contour) > 50 and cont_len ==2:
           print('The largest contour is touching the bottom of the image')
           print("SPEED UP")
+          
+
         else:
           print("drive normally")
         
