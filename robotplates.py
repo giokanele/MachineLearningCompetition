@@ -19,7 +19,8 @@ index = 0
 user_input = ""
 capture = threading.Event()
 capture.clear()
-licensePlateModel = models.load_model("/home/fizzer/ros_ws/src/comp/licenseNNv2.keras")
+reset = threading.Event()
+licensePlateModel = models.load_model("/home/fizzer/ros_ws/src/my_controller/licenseNNv2.keras")
 
 class history:
 
@@ -43,7 +44,7 @@ class history:
     if found == 1:
       self.plates.append(plate)
 
-    if(self.state <= 9):
+    if(self.state < 8):
       sample, waittime = self.timings[self.state + 1]
     else:
       sample, waittime = (20, 30)
@@ -56,7 +57,6 @@ class history:
         self.state += 1
       self.green = False
       
-    
     if(send == True):
       self.sendmessage()
       # print("Sending!")
@@ -95,6 +95,12 @@ class image_converter:
   def callback(self,data):
     global capture
     global user_input
+    global reset
+    if reset.is_set():
+      self.history.__init__()
+      print("Reset successful!")
+      self.license_pub.publish("Gio's team,password,0,AA00")
+      reset.clear()
 
     
     timer = time.time()
@@ -358,10 +364,24 @@ def collect_plates():
     else: 
       user_input = value
       # Do something with the user input
+def reset_button():
+  global reset
+  while True:
+    value = input()
+    if(value == "reset"):
+      reset.set()
+      print("Resetting queue")
+
 
 if __name__ == '__main__':
     if False: # for data collection
       background_thread = threading.Thread(target=collect_plates)
       background_thread.daemon = True
       background_thread.start()
+    if True:
+      background_thread = threading.Thread(target=reset_button)
+      background_thread.daemon = True
+      background_thread.start()
+      reset.clear()
+
     main()
